@@ -6,26 +6,27 @@ function App() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [newReading, setNewReading] = useState('');
-  const [notes, setNotes] = useState('');
+  const [lastUpdate, setLastUpdate] = useState(null);
 
   // Fetch CSV data from GitHub
   useEffect(() => {
     fetchData();
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(fetchData, 10 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchData = async () => {
     try {
-      setLoading(true);
-      // Fetch raw CSV from GitHub
+      // Add timestamp to bust cache
+      const timestamp = new Date().getTime();
       const response = await fetch(
-        'https://raw.githubusercontent.com/bbarna123/bgreadings/main/data/readings.csv'
+        `https://raw.githubusercontent.com/bbarna123/bgreadings/main/data/readings.csv?t=${timestamp}`
       );
       const csv = await response.text();
       
       // Parse CSV
       const lines = csv.trim().split('\n');
-      const headers = lines[0].split(',');
       const readings = lines.slice(1).map(line => {
         const values = line.split(',');
         return {
@@ -47,42 +48,14 @@ function App() {
       }));
 
       setData(formattedData);
+      setLastUpdate(new Date());
       setError(null);
     } catch (err) {
       console.error('Error fetching data:', err);
-      setError('Failed to load blood sugar readings. Make sure the data/readings.csv file exists.');
+      setError('Failed to load blood sugar readings.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleAddReading = (e) => {
-    e.preventDefault();
-    const reading = parseInt(newReading);
-    
-    if (!reading || reading < 20 || reading > 600) {
-      alert('Please enter a valid blood sugar reading (20-600 mg/dL)');
-      return;
-    }
-
-    const timestamp = new Date().toISOString();
-    const newEntry = {
-      timestamp,
-      reading_mg_dl: reading,
-      notes,
-      displayTime: new Date(timestamp).toLocaleString(),
-      shortTime: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    // Add to data
-    const updated = [...data, newEntry].slice(-20);
-    setData(updated);
-
-    // Reset form
-    setNewReading('');
-    setNotes('');
-
-    alert('Reading added! To persist to GitHub, you need to use the API endpoint. See README for instructions.');
   };
 
   const stats = data.length > 0 ? {
@@ -91,14 +64,45 @@ function App() {
     max: Math.max(...data.map(d => d.reading_mg_dl))
   } : null;
 
+  const getReadingStatus = (reading) => {
+    if (reading > 180) return { color: '#d32f2f', status: 'High' };
+    if (reading < 70) return { color: '#f57c00', status: 'Low' };
+    return { color: '#388e3c', status: 'Normal' };
+  };
+
+  const latestReading = data.length > 0 ? data[data.length - 1] : null;
+  const latestStatus = latestReading ? getReadingStatus(latestReading.reading_mg_dl) : null;
+
   return (
     <div className="App">
       <header className="App-header">
         <h1>📊 Blood Sugar Readings</h1>
         <p>Track and visualize your blood glucose levels</p>
+        <p className="update-time">
+          {lastUpdate ? `Last updated: ${lastUpdate.toLocaleTimeString()}` : 'Loading...'}
+        </p>
       </header>
 
       <main className="container">
+        {/* Latest Reading - Top Bar */}
+        {latestReading && latestStatus && (
+          <div className="latest-bar" style={{ borderLeftColor: latestStatus.color }}>
+            <div className="latest-info">
+              <span className="latest-label">Latest Reading:</span>
+              <span className="latest-value" style={{ color: latestStatus.color }}>
+                {latestReading.reading_mg_dl} mg/dL
+              </span>
+              <span className="latest-status" style={{ color: latestStatus.color }}>
+                ({latestStatus.status})
+              </span>
+              {latestReading.notes && (
+                <span className="latest-notes">• {latestReading.notes}</span>
+              )}
+            </div>
+            <span className="latest-time">{latestReading.shortTime}</span>
+          </div>
+        )}
+
         {/* Statistics */}
         {stats && (
           <div className="stats">
@@ -168,37 +172,6 @@ function App() {
           <p className="no-data">No data available</p>
         )}
 
-        {/* Add Reading Form */}
-        <div className="form-container">
-          <h2>Add New Reading</h2>
-          <form onSubmit={handleAddReading}>
-            <div className="form-group">
-              <label htmlFor="reading">Blood Sugar Reading (mg/dL)</label>
-              <input
-                id="reading"
-                type="number"
-                value={newReading}
-                onChange={(e) => setNewReading(e.target.value)}
-                placeholder="Enter reading (e.g., 120)"
-                min="20"
-                max="600"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="notes">Notes (optional)</label>
-              <input
-                id="notes"
-                type="text"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g., After breakfast, Before lunch"
-              />
-            </div>
-            <button type="submit" className="submit-btn">Add Reading</button>
-          </form>
-        </div>
-
         {/* Recent Readings Table */}
         {data.length > 0 && (
           <div className="table-container">
@@ -212,15 +185,18 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {[...data].reverse().map((reading, idx) => (
-                  <tr key={idx}>
-                    <td>{reading.displayTime}</td>
-                    <td className={reading.reading_mg_dl > 180 ? 'high' : reading.reading_mg_dl < 70 ? 'low' : 'normal'}>
-                      {reading.reading_mg_dl}
-                    </td>
-                    <td>{reading.notes}</td>
-                  </tr>
-                ))}
+                {[...data].reverse().map((reading, idx) => {
+                  const status = getReadingStatus(reading.reading_mg_dl);
+                  return (
+                    <tr key={idx}>
+                      <td>{reading.displayTime}</td>
+                      <td style={{ color: status.color, fontWeight: 600 }}>
+                        {reading.reading_mg_dl}
+                      </td>
+                      <td>{reading.notes}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
