@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Blood sugar readings tracker with API and chart visualization",
   "private": true,
+  "homepage": "https://bbarna123.github.io/bgreadings/",
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
