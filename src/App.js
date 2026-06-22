@@ -90,7 +90,7 @@ function App() {
             <div className="latest-info">
               <span className="latest-label">Latest Reading:</span>
               <span className="latest-value" style={{ color: latestStatus.color }}>
-                {latestReading.reading_mg_dl} mg/dL
+                {latestReading.reading_mg_dl} mmol/l
               </span>
               <span className="latest-status" style={{ color: latestStatus.color }}>
                 ({latestStatus.status})
@@ -108,15 +108,15 @@ function App() {
           <div className="stats">
             <div className="stat-card">
               <span className="stat-label">Average</span>
-              <span className="stat-value">{stats.average} mg/dL</span>
+              <span className="stat-value">{stats.average} mmol/l</span>
             </div>
             <div className="stat-card">
               <span className="stat-label">Min</span>
-              <span className="stat-value">{stats.min} mg/dL</span>
+              <span className="stat-value">{stats.min} mmol/l</span>
             </div>
             <div className="stat-card">
               <span className="stat-label">Max</span>
-              <span className="stat-value">{stats.max} mg/dL</span>
+              <span className="stat-value">{stats.max} mmol/l</span>
             </div>
             <div className="stat-card">
               <span className="stat-label">Readings</span>
